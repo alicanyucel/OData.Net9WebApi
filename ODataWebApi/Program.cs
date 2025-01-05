@@ -1,37 +1,34 @@
-
+using Bogus;
+using Microsoft.AspNetCore.OData;
+using Microsoft.EntityFrameworkCore;
+using ODataWebApi.Context;
+using ODataWebApi.Models;
 using Scalar.AspNetCore;
 
-namespace ODataWebApi
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddControllers().AddOData(opt=>opt.EnableQueryFeatures());
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("SqlServer")));
+
+builder.Services.AddOpenApi();
+var app = builder.Build();
+//minimal api
+app.MapGet("seed-data/categoties", async (ApplicationDbContext dbContext) =>
 {
-    public class Program
+    Faker faker = new();
+
+    var categoryNames = faker.Commerce.Categories(100);
+    List<Category> categories = categoryNames.Select(s => new Category
     {
-        public static void Main(string[] args)
-        {
-            var builder = WebApplication.CreateBuilder(args);
+        Name = s,
+    }).ToList();
+    dbContext.AddRange(categories);
 
-            // Add services to the container.
+    await dbContext.SaveChangesAsync();
 
-            builder.Services.AddControllers();
-            // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-            builder.Services.AddOpenApi();
-            // evde devam edecem
-            var app = builder.Build();
-
-            // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
-            {
-                app.MapOpenApi();
-                app.MapScalarApiReference();
-            }
-
-            app.UseHttpsRedirection();
-
-            app.UseAuthorization();
-
-
-            app.MapControllers();
-
-            app.Run();
-        }
-    }
-}
+    return Results.NoContent();
+}).Produces(204).WithTags("SeedCategories");
+app.MapOpenApi();
+app.MapScalarApiReference();
+app.MapControllers();
+app.Run();
